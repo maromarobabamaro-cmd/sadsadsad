@@ -8,7 +8,9 @@ By default, the values defined in the classes are used, these can be overridden 
 import os
 from enum import Enum
 
-from pydantic import BaseModel, computed_field
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, computed_field, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -392,6 +394,21 @@ class _Redis(EnvConfig, env_prefix="redis_"):
     password: str = ""
     port: int = 6379
     use_fakeredis: bool = False  # If this is True, Bot will use fakeredis.aioredis
+
+    @model_validator(mode="before")
+    @classmethod
+    def parse_redis_url(cls, values: dict) -> dict:
+        """Parse REDIS_URL if provided (e.g. from Railway) and extract host/port/password."""
+        redis_url = os.environ.get("REDIS_URL")
+        if redis_url:
+            parsed = urlparse(redis_url)
+            if parsed.hostname:
+                values["host"] = parsed.hostname
+            if parsed.port:
+                values["port"] = parsed.port
+            if parsed.password:
+                values["password"] = parsed.password
+        return values
 
 
 Redis = _Redis()
