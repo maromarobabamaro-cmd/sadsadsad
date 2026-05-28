@@ -28,8 +28,18 @@ async def _create_redis_session() -> RedisSession:
     )
     try:
         return await redis_session.connect()
-    except RedisError as e:
-        raise StartupError(e)
+    except RedisError:
+        log = get_logger("bot")
+        log.warning("Could not connect to Redis, falling back to fakeredis (in-memory, no persistence).")
+        fallback = RedisSession(
+            use_fakeredis=True,
+            global_namespace="bot",
+            decode_responses=True,
+        )
+        try:
+            return await fallback.connect()
+        except RedisError as e:
+            raise StartupError(e)
 
 
 async def main() -> None:
