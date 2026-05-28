@@ -18,28 +18,36 @@ LOCALHOST = "127.0.0.1"
 
 async def _create_redis_session() -> RedisSession:
     """Create and connect to a redis session."""
+    use_fakeredis = constants.Redis.use_fakeredis
+
+    # If not explicitly using fakeredis, probe the real Redis first.
+    # RedisSession is a singleton so we can only instantiate it once —
+    # decide up-front whether to use fakeredis.
+    if not use_fakeredis:
+        import socket
+        try:
+            socket.getaddrinfo(constants.Redis.host, constants.Redis.port)
+        except OSError:
+            log = get_logger("bot")
+            log.warning(
+                "Redis host %s is not reachable, falling back to fakeredis "
+                "(in-memory, no persistence).",
+                constants.Redis.host,
+            )
+            use_fakeredis = True
+
     redis_session = RedisSession(
         host=constants.Redis.host,
         port=constants.Redis.port,
         password=constants.Redis.password,
-        use_fakeredis=constants.Redis.use_fakeredis,
+        use_fakeredis=use_fakeredis,
         global_namespace="bot",
         decode_responses=True,
     )
     try:
         return await redis_session.connect()
-    except RedisError:
-        log = get_logger("bot")
-        log.warning("Could not connect to Redis, falling back to fakeredis (in-memory, no persistence).")
-        fallback = RedisSession(
-            use_fakeredis=True,
-            global_namespace="bot",
-            decode_responses=True,
-        )
-        try:
-            return await fallback.connect()
-        except RedisError as e:
-            raise StartupError(e)
+    except RedisError as e:
+        raise StartupError(e)
 
 
 async def main() -> None:
