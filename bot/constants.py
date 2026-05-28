@@ -10,7 +10,7 @@ from enum import Enum
 
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, computed_field, model_validator
+from pydantic import BaseModel, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -42,6 +42,14 @@ class _Bot(EnvConfig, env_prefix="bot_"):
     sentry_dsn: str = ""
     token: str
     trace_loggers: str = "*"
+
+    @field_validator("token", mode="before")
+    @classmethod
+    def strip_token(cls, v: str) -> str:
+        """Strip any accidental whitespace or quotes from the token."""
+        if isinstance(v, str):
+            return v.strip().strip('"').strip("'")
+        return v
 
 
 Bot = _Bot()
